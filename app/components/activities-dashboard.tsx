@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { StravaActivity, StravaAthlete } from "@/types/strava";
 import { ActivityCard } from "./activity-card";
+import { BrandLogo } from "./brand-logo";
 import {
   STORAGE_KEY,
   CacheInfo,
