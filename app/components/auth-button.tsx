@@ -1,6 +1,7 @@
 'use client';
 
 import { signIn, signOut, useSession } from "next-auth/react";
+import Image from "next/image";
 
 export function AuthButton() {
   const { data: session, status } = useSession();
@@ -12,11 +13,15 @@ export function AuthButton() {
   if (session) {
     return (
       <div className="flex items-center gap-3">
-        <img
-          src={session.user?.image || ''}
-          alt={session.user?.name || 'Profile'}
-          className="w-6 h-6 rounded-full"
-        />
+        {session.user?.image && (
+          <Image
+            src={session.user.image}
+            alt={session.user?.name || 'Profile'}
+            width={24}
+            height={24}
+            className="rounded-full"
+          />
+        )}
         <span className="text-sm">{session.user?.name}</span>
         <button
           onClick={() => signOut()}

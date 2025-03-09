@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { getActivities } from "@/utils/strava";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "../auth/auth.config";
 
 export async function GET(request: Request) {
   try {
