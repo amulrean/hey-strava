@@ -86,9 +86,11 @@ export async function getActivity(
   );
 }
 
+const METERS_PER_MILE = 1609.344;
+
 export function formatDistance(meters: number): string {
-  const kilometers = meters / 1000;
-  return `${kilometers.toFixed(2)} km`;
+  const miles = meters / METERS_PER_MILE;
+  return `${miles.toFixed(2)} mi`;
 }
 
 export function formatDuration(seconds: number): string {
@@ -105,6 +107,11 @@ export function formatDuration(seconds: number): string {
 }
 
 export function formatPace(meters: number, seconds: number): string {
-  const kilometersPerHour = (meters / 1000) / (seconds / 3600);
-  return `${kilometersPerHour.toFixed(1)} km/h`;
+  // Convert to minutes per mile
+  const miles = meters / METERS_PER_MILE;
+  const minutes = seconds / 60;
+  const minutesPerMile = minutes / miles;
+  const minutesPart = Math.floor(minutesPerMile);
+  const secondsPart = Math.round((minutesPerMile - minutesPart) * 60);
+  return `${minutesPart}:${secondsPart.toString().padStart(2, "0")} /mi`;
 }
