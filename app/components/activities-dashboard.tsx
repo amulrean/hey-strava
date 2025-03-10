@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import { StravaActivity, StravaAthlete } from "@/types/strava";
 import { ActivityCard } from "./activity-card";
-import { BrandLogo } from "./brand-logo";
+
 import {
   STORAGE_KEY,
   CacheInfo,
@@ -66,32 +67,42 @@ export function ActivitiesDashboard() {
         const fetchedActivities = data.activities as StravaActivity[];
         
         // Ensure unique activities by using a Map with activity ID as key
-        const uniqueActivities = new Map(
-          page === 1
-            ? fetchedActivities.map((a) => [a.id, a])
-            : [...activities, ...fetchedActivities].map((a) => [a.id, a])
-        );
-        
-        const newActivities = Array.from(uniqueActivities.values()) as StravaActivity[];
-        const newAthlete = includeAthlete && data.athlete ? data.athlete : athlete;
-        
-        setActivities(newActivities);
-        setHasMore(data.has_more && fetchedActivities.length > 0);
-        
-        if (includeAthlete && data.athlete) {
-          setAthlete(data.athlete);
+        if (page === 1) {
+          // For first page, just use the fetched activities
+          setActivities(fetchedActivities);
+          if (data.athlete) {
+            setAthlete(data.athlete);
+          }
+        } else {
+          // For subsequent pages, append new activities while ensuring uniqueness
+          setActivities(prevActivities => {
+            const uniqueActivities = new Map(
+              [...prevActivities, ...fetchedActivities]
+                .map(a => [a.id, a])
+            );
+            return Array.from(uniqueActivities.values());
+          });
         }
         
-        const timestamp = Date.now();
-        // Cache the complete data
-        saveToLocalStorage({
-          activities: newActivities,
-          athlete: newAthlete,
-          page,
-          hasMore: data.has_more,
-          timestamp,
-        });
+        setHasMore(data.has_more && fetchedActivities.length > 0);
         
+        // Get current state for caching
+        setActivities(currentActivities => {
+          setAthlete(currentAthlete => {
+            const timestamp = Date.now();
+            // Cache the complete data
+            saveToLocalStorage({
+              activities: currentActivities,
+              athlete: currentAthlete,
+              page,
+              hasMore: data.has_more,
+              timestamp,
+            });
+            return currentAthlete;
+          });
+          return currentActivities;
+        });
+
         // Update cache info
         setCacheInfo({
           isCached: true,
@@ -105,7 +116,7 @@ export function ActivitiesDashboard() {
     }
 
     fetchActivities();
-  }, [session, page]);
+  }, [session, page]); // Only depend on session and page
 
   if (!session) {
     return null;
@@ -129,6 +140,30 @@ export function ActivitiesDashboard() {
 
   return (
     <div>
+      {athlete && (
+        <div className="flex items-center gap-4 p-4 mb-6 bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="relative w-12 h-12 rounded-full bg-gray-100 overflow-hidden">
+            <Image
+              src={athlete.profile_medium}
+              alt={`${athlete.firstname} ${athlete.lastname}`}
+              fill
+              sizes="48px"
+              className="object-cover"
+            />
+          </div>
+          <div>
+            <h2 className="font-medium text-gray-900">
+              {athlete.firstname} {athlete.lastname}
+            </h2>
+            <p className="text-sm text-gray-500">
+              {[athlete.city, athlete.state, athlete.country]
+                .filter(Boolean)
+                .join(', ')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
