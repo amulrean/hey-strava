@@ -63,11 +63,20 @@ export function ActivitiesDashboard() {
         }
         
         const data = await response.json();
-        const newActivities = page === 1 ? data.activities : [...activities, ...data.activities];
+        const fetchedActivities = data.activities as StravaActivity[];
+        
+        // Ensure unique activities by using a Map with activity ID as key
+        const uniqueActivities = new Map(
+          page === 1
+            ? fetchedActivities.map((a) => [a.id, a])
+            : [...activities, ...fetchedActivities].map((a) => [a.id, a])
+        );
+        
+        const newActivities = Array.from(uniqueActivities.values()) as StravaActivity[];
         const newAthlete = includeAthlete && data.athlete ? data.athlete : athlete;
         
         setActivities(newActivities);
-        setHasMore(data.has_more);
+        setHasMore(data.has_more && fetchedActivities.length > 0);
         
         if (includeAthlete && data.athlete) {
           setAthlete(data.athlete);
