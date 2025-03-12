@@ -1,142 +1,28 @@
 'use client';
 
-import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import { StravaActivity, StravaAthlete } from "@/types/strava";
 import { ActivityCard } from "./activity-card";
-
-import {
-  STORAGE_KEY,
-  CacheInfo,
-  getFromLocalStorage,
-  saveToLocalStorage,
-  getCacheSize,
-  cleanupExpiredCaches,
-  calculateCacheExpiry
-} from "@/utils/cache";
+import { useStravaActivities } from "../hooks/useStravaActivities";
+import { getCacheSize } from "@/utils/cache";
 
 export function ActivitiesDashboard() {
   const { data: session } = useSession();
-  const [activities, setActivities] = useState<StravaActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-
-  const [hasMore, setHasMore] = useState(true);
-  const [athlete, setAthlete] = useState<StravaAthlete | null>(null);
-  const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
-
-  useEffect(() => {
-    async function fetchActivities() {
-      if (!session) return;
-      
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Check local storage first if we're on page 1
-        if (page === 1) {
-          const cached = getFromLocalStorage();
-          if (cached) {
-            setActivities(cached.activities);
-            setAthlete(cached.athlete);
-            setPage(cached.page);
-            setHasMore(cached.hasMore);
-            setLoading(false);
-            
-            setCacheInfo({
-              isCached: true,
-              expiresIn: calculateCacheExpiry(cached.timestamp)
-            });
-            return;
-          }
-        }
-
-        // Include athlete info only on first load
-        const includeAthlete = page === 1;
-        const response = await fetch(
-          `/api/activities?page=${page}&per_page=10${includeAthlete ? '&include_athlete=true' : ''}`
-        );
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch activities');
-        }
-        
-        const data = await response.json();
-        const fetchedActivities = data.activities as StravaActivity[];
-        
-        // Ensure unique activities by using a Map with activity ID as key
-        if (page === 1) {
-          // For first page, just use the fetched activities
-          setActivities(fetchedActivities);
-          if (data.athlete) {
-            setAthlete(data.athlete);
-          }
-        } else {
-          // For subsequent pages, append new activities while ensuring uniqueness
-          setActivities(prevActivities => {
-            const uniqueActivities = new Map(
-              [...prevActivities, ...fetchedActivities]
-                .map(a => [a.id, a])
-            );
-            return Array.from(uniqueActivities.values());
-          });
-        }
-        
-        setHasMore(data.has_more && fetchedActivities.length > 0);
-        
-        // Get current state for caching
-        setActivities(currentActivities => {
-          setAthlete(currentAthlete => {
-            const timestamp = Date.now();
-            // Cache the complete data
-            saveToLocalStorage({
-              activities: currentActivities,
-              athlete: currentAthlete,
-              page,
-              hasMore: data.has_more,
-              timestamp,
-            });
-            return currentAthlete;
-          });
-          return currentActivities;
-        });
-
-        // Update cache info
-        setCacheInfo({
-          isCached: true,
-          expiresIn: '7d 0h'
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchActivities();
-  }, [session, page]); // Only depend on session and page
+  const {
+    activities,
+    athlete,
+    loading,
+    error,
+    hasMore,
+    cacheInfo,
+    refresh,
+    loadMore,
+    clearCache,
+  } = useStravaActivities(session);
 
   if (!session) {
     return null;
   }
-
-  const handleRefresh = () => {
-    setPage(1);
-    localStorage.removeItem(STORAGE_KEY);
-    setCacheInfo(null);
-  };
-
-  const handleClearCache = () => {
-    cleanupExpiredCaches();
-    setPage(1);
-    setCacheInfo(null);
-    const size = getCacheSize();
-    if (size > 0) {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  };
 
   return (
     <div>
@@ -178,7 +64,7 @@ export function ActivitiesDashboard() {
           <div className="flex items-center gap-2">
             {cacheInfo?.isCached && (
               <button
-                onClick={handleClearCache}
+                onClick={clearCache}
                 className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded"
                 title="Clear cached data"
               >
@@ -200,7 +86,7 @@ export function ActivitiesDashboard() {
               </button>
             )}
             <button
-              onClick={handleRefresh}
+              onClick={refresh}
               className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2"
               disabled={loading}
             >
@@ -239,7 +125,7 @@ export function ActivitiesDashboard() {
       {activities.length > 0 && !loading && hasMore && (
         <div className="mt-4 text-center">
           <button
-            onClick={() => setPage(p => p + 1)}
+            onClick={loadMore}
             className="px-4 py-2 text-sm border hover:bg-gray-50"
           >
             Load More
